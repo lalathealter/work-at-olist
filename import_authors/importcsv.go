@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/lalathealter/olist/db"
-	"github.com/lib/pq"
 )
 
 var ErrNoOriginFile = errors.New("ERROR: no origin file was provided")
@@ -33,6 +32,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer originFile.Close()
 
 	targetDB, err := db.Connect()
 	if err != nil {
@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 
-	stmnt, err := tx.Prepare(pq.CopyIn(db.TableAuthors, db.AuthorName))
+	stmt, err := tx.Prepare(db.InsertAuthorStmt)
 	if err != nil {
 		panic(err)
 	}
@@ -56,12 +56,12 @@ func main() {
 	for fileScanner.Scan() {
 		authorLine := fileScanner.Text()
 		if authorLine != "" {
-			stmnt.Exec(authorLine)
+			stmt.Exec(authorLine)
 		}
 		linesNum++
 	}
 
-	err = stmnt.Close()
+	err = stmt.Close()
 	if err != nil {
 		panic(err)
 	}
