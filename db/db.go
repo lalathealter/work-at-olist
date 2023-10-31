@@ -3,28 +3,52 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
-	"strconv"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
-const envpath = "../.env"
-
 const TableAuthors = "authors"
 const AuthorName = "name"
 
+var InsertAuthorStmt = fmt.Sprintf(`
+  INSERT INTO %s (%s) VALUES ($1)
+  ON CONFLICT DO NOTHING`,
+	TableAuthors, AuthorName,
+)
+
+var SelectAuthorsStmt = fmt.Sprintf(`
+  SELECT *
+  FROM %s
+  WHERE %s LIKE $1
+  `, TableAuthors, AuthorName,
+)
+
+var Instance *sql.DB
+
+func init() {
+	db, err := Connect()
+	if err != nil {
+		log.Panic(err)
+	}
+	Instance = db
+}
+
 func Connect() (*sql.DB, error) {
-	godotenv.Load(envpath)
+	err := godotenv.Load("../.env")
+	if err != nil {
+		return nil, err
+	}
+
 	dbuser := os.Getenv("dbuser")
 	dbpassword := os.Getenv("dbpassword")
 	dbname := os.Getenv("dbname")
 	dbhost := os.Getenv("dbhost")
-	dbportStr := os.Getenv("dbport")
-	dbport, _ := strconv.Atoi(dbportStr)
+	dbport := os.Getenv("dbport")
 
-	connString := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
+	connString := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
 		dbuser, dbpassword, dbname, dbhost, dbport)
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
