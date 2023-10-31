@@ -34,11 +34,10 @@ func main() {
 	}
 	defer originFile.Close()
 
-	targetDB, err := db.Connect()
+	targetDB := db.Instance
 	if err != nil {
 		panic(err)
 	}
-	defer targetDB.Close()
 
 	tx, err := targetDB.Begin()
 	if err != nil {

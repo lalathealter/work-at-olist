@@ -29,14 +29,14 @@ var SelectAuthorsStmt = fmt.Sprintf(`
 var Instance *sql.DB
 
 func init() {
-	db, err := Connect()
+	db, err := connect()
 	if err != nil {
 		log.Panic(err)
 	}
 	Instance = db
 }
 
-func Connect() (*sql.DB, error) {
+func connect() (*sql.DB, error) {
 	err := godotenv.Load("../.env")
 	if err != nil {
 		return nil, err
