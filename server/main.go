@@ -46,10 +46,13 @@ func main() {
 
 }
 
+const MAX_AUTHORS = 50
+
 func HandlePostBooks(w http.ResponseWriter, r *http.Request) {
 	bookObj := db.BookModel{}
 	err := json.NewDecoder(r.Body).Decode(&bookObj)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		panic(err)
 	}
 
@@ -63,6 +66,11 @@ func HandlePostBooks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Book must have at least one author",
 			http.StatusBadRequest)
 		return
+	}
+
+	if len(bookObj.Authors) > MAX_AUTHORS {
+		http.Error(w, "Book provided has too many authors mentioned",
+			http.StatusBadRequest)
 	}
 
 	err = db.SearchForAuthors(bookObj.Authors)
