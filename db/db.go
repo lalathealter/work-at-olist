@@ -102,6 +102,55 @@ func SearchForAuthors(authorIds []int) error {
 	return nil
 }
 
+const (
+	TableBooks  = "books"
+	BookId      = "id"
+	BookName    = "name"
+	BookEdition = "edition"
+	BookPubYear = "publication_year"
+)
+
+var BookInsertStmt = fmt.Sprintf(`
+  INSERT INTO %s(%s, %s, %s)
+  VALUES($1, $2, $3)
+  RETURNING %s;
+  `, TableBooks, BookName, BookEdition, BookPubYear, BookId)
+
+const (
+	TableBooksAuthorsLinks = "authors_books_links"
+	BALinksBookId          = "book_id"
+	BALinksAuthorId        = "author_id"
+)
+
+var BooksAuthorsLinkInsertStmt = fmt.Sprintf(`
+  INSERT INTO %s(%s, %s)
+  VALUES (%%d, $1)
+  `, TableBooksAuthorsLinks, BALinksBookId, BALinksAuthorId)
+
 func InsertBook(book BookModel) error {
-	return nil
+	tx, err := Instance.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res := tx.QueryRow(BookInsertStmt, book.Name, book.Edition, book.PubYear)
+
+	var newBookId int
+	err = res.Scan(&newBookId)
+	if err != nil {
+		return err
+	}
+
+	fixedBookIdStmt := fmt.Sprintf(BooksAuthorsLinkInsertStmt, newBookId)
+	stmt, err := tx.Prepare(fixedBookIdStmt)
+	if err != nil {
+		return err
+	}
+	for _, authorId := range book.Authors {
+		stmt.Exec(authorId)
+	}
+
+	err = tx.Commit()
+	return err
 }
