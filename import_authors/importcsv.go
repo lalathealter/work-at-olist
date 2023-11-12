@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/lalathealter/olist/db"
+	"gorm.io/gorm"
 )
 
 var ErrNoOriginFile = errors.New("ERROR: no origin file was provided")
@@ -34,41 +35,34 @@ func main() {
 	}
 	defer originFile.Close()
 
-	targetDB := db.Instance
-	if err != nil {
-		panic(err)
-	}
-
-	tx, err := targetDB.Begin()
-	if err != nil {
-		panic(err)
-	}
-
-	stmt, err := tx.Prepare(db.InsertAuthorStmt)
+	targetDB := db.Use()
 	if err != nil {
 		panic(err)
 	}
 
 	fileScanner := bufio.NewScanner(originFile)
 	fileScanner.Split(bufio.ScanLines)
+
 	linesNum := 0
+	const batchSize = 50
+	targetDB = targetDB.Session(&gorm.Session{
+		CreateBatchSize: batchSize,
+	})
+
+	batch := make([]*db.Author, 0, batchSize)
 	for fileScanner.Scan() {
 		authorLine := fileScanner.Text()
 		if authorLine != "" {
-			stmt.Exec(authorLine)
+			authorObj := db.Author{Name: authorLine}
+			batch = append(batch, &authorObj)
 		}
 		linesNum++
+		if len(batch) == batchSize {
+			targetDB.Create(batch)
+			batch = make([]*db.Author, 0, batchSize)
+		}
 	}
-
-	err = stmt.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		panic(err)
-	}
+	targetDB.Create(batch)
 
 	fmt.Printf("Finished importing: %v lines processed\n", linesNum)
 }
