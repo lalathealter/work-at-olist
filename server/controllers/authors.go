@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -42,4 +43,23 @@ func HandleGetAuthors(c *gin.Context) {
 		"nextPage": nextPageNum,
 	})
 	c.Query(pageQuery)
+}
+
+var ErrPathParameterIsntInteger = errors.New("Path parameter should be a positive integer")
+
+func HandleGetSingleAuthor(c *gin.Context) {
+	idparam := c.Param("id")
+	id64, err := strconv.ParseUint(idparam, 10, 64)
+	id := uint(id64)
+
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, ErrPathParameterIsntInteger)
+		return
+	}
+
+	dbi := db.Use()
+	authorObj := db.Author{ID: id}
+	dbi.First(&authorObj)
+
+	c.JSON(http.StatusOK, authorObj)
 }
