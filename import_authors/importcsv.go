@@ -58,11 +58,16 @@ func main() {
 		}
 		linesNum++
 		if len(batch) == batchSize {
-			targetDB.Create(batch)
+      if dbc := targetDB.Create(batch); dbc.Error != nil {
+        panic(dbc.Error)
+      }
 			batch = make([]*db.Author, 0, batchSize)
 		}
 	}
-	targetDB.Create(batch)
+  if dbc := targetDB.Create(batch); dbc.Error != nil {
+    panic(dbc.Error)
+  }
+
 
 	fmt.Printf("Finished importing: %v lines processed\n", linesNum)
 }

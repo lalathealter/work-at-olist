@@ -28,14 +28,22 @@ func HandlePostBooks(c *gin.Context) {
 		PubYear: bookInput.PubYear,
 		Edition: bookInput.Edition,
 	}
-	dbi.Create(&newBook)
+
+	if dbc := dbi.Create(&newBook); dbc.Error != nil {
+		c.AbortWithError(http.StatusBadRequest, dbc.Error)
+		return
+	}
 
 	for _, author := range bookInput.Authors {
 		balink := db.BookAuthorLink{
 			BookID:   newBook.ID,
 			AuthorID: author,
 		}
-		dbi.Create(&balink)
+
+		if dbc := dbi.Create(&balink); dbc.Error != nil {
+			c.AbortWithError(http.StatusInternalServerError, dbc.Error)
+			return
+		}
 	}
 
 	c.Status(http.StatusCreated)
