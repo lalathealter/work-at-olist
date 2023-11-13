@@ -54,15 +54,15 @@ func setup() (*gorm.DB, error) {
 type Book struct {
 	ID      uint
 	Name    string
-	Edition int
+	Edition uint
 	PubYear int
 }
 
 type BookAuthorLink struct {
 	ID       uint
-	BookID   int
+	BookID   uint
 	Book     Book
-	AuthorID int
+	AuthorID uint
 	Author   Author
 }
 
