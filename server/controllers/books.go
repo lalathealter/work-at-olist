@@ -57,8 +57,15 @@ func HandleGetBooks(c *gin.Context) {
 				Where("Author_ID = ?", authorId),
 		)
 	}
-	out := make([]*db.Book, 0, 5)
-	dbi.Find(&out, &bookDetails)
+
+	out := make([]*db.BookWithAuthors, 0, 5)
+	authorsSub := db.Use().Model(&db.BookAuthorLink{}).
+		Select("book_id", "ARRAY_AGG(author_id) AS authors").
+		Group("book_id")
+
+	dbi.Select("authors", "name", "edition", "pub_year", "ID").
+		Joins("INNER JOIN (?) auths ON books.ID = auths.book_id", authorsSub).
+		Find(&out, &bookDetails)
 
 	c.JSON(http.StatusOK, out)
 }
