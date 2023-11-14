@@ -42,7 +42,6 @@ func HandleGetAuthors(c *gin.Context) {
 		"page":     pageNum,
 		"nextPage": nextPageNum,
 	})
-	c.Query(pageQuery)
 }
 
 var ErrPathParameterIsntInteger = errors.New("Path parameter should be a positive integer")

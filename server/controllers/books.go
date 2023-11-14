@@ -2,10 +2,66 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lalathealter/olist/db"
 )
+
+const (
+	nameQuery    = "name"
+	pubYearQuery = "publication_year"
+	editionQuery = "edition"
+	authorQuery  = "author"
+)
+
+func HandleGetBooks(c *gin.Context) {
+	name := c.Query(nameQuery)
+	pubYearStr := c.Query(pubYearQuery)
+	editionStr := c.Query(editionQuery)
+	authorStr := c.Query(authorQuery)
+
+	pubYear, errPubYearConv := strconv.Atoi(pubYearStr)
+
+	editionUint64, errEditionConv := strconv.ParseUint(editionStr, 10, 64)
+	var edition uint
+	if errEditionConv == nil {
+		edition = uint(editionUint64)
+	}
+
+	authorUint64, errAuthorConv := strconv.ParseUint(authorStr, 10, 64)
+	var authorId uint
+	if errAuthorConv == nil {
+		authorId = uint(authorUint64)
+	}
+
+	dbi := db.Use()
+
+	bookDetails := db.Book{}
+	if name != "" {
+		bookDetails.Name = name
+	}
+	if errPubYearConv == nil {
+		bookDetails.PubYear = pubYear
+	}
+	if errEditionConv == nil {
+		bookDetails.Edition = edition
+	}
+
+	if errAuthorConv == nil {
+		dbi = dbi.Model(&db.Book{}).Where(
+			"(ID) IN (?)",
+			dbi.
+				Model(&db.BookAuthorLink{}).
+				Select("BookID").
+				Where("Author_ID = ?", authorId),
+		)
+	}
+	out := make([]*db.Book, 0, 5)
+	dbi.Find(&out, &bookDetails)
+
+	c.JSON(http.StatusOK, out)
+}
 
 type BookInput struct {
 	Name    string `binding:"required"`
