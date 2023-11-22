@@ -69,9 +69,9 @@ type BookWithAuthors struct {
 
 type BookAuthorLink struct {
 	ID       uint
-	BookID   uint `gorm:"not null;index:balink,unique"`
+	BookID   uint `gorm:"constraint:OnDelete:CASCADE,OnUpdate:CASCADE;not null;index:balink,unique"`
 	Book     Book
-	AuthorID uint `gorm:"not null;index:balink,unique"`
+	AuthorID uint `gorm:"constraint:OnDelete:CASCADE,OnUpdate:CASCADE;not null;index:balink,unique"`
 	Author   Author
 }
 

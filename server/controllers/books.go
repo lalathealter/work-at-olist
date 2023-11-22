@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -110,4 +111,43 @@ func HandlePostBooks(c *gin.Context) {
 	}
 
 	c.Status(http.StatusCreated)
+}
+
+var ErrToDeleteMustProvideBookID = errors.New("In order to delete a book you need to specify its ID")
+
+func HandleDeleteBooks(c *gin.Context) {
+
+	idString, isThere := c.Params.Get("id")
+	if !isThere {
+		c.AbortWithError(http.StatusBadRequest, ErrToDeleteMustProvideBookID)
+		return
+	}
+
+	idToDel64, err := strconv.ParseUint(idString, 10, 64)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	idToDel := uint(idToDel64)
+
+	dbi := db.Use()
+
+	balToDelete := db.BookAuthorLink{BookID: idToDel}
+	if err := dbi.Where(&balToDelete).Delete(&balToDelete).Error; err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	bookToDelete := db.Book{ID: idToDel}
+	if dbi = dbi.Delete(&bookToDelete); dbi.Error != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	if dbi.RowsAffected < 1 {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
