@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lalathealter/olist/db"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -78,6 +80,10 @@ type BookInput struct {
 	Authors []uint `binding:"required"`
 }
 
+const MAX_AUTHORS_FOR_BOOK = 32
+
+var ErrTooManyAuthors = errors.New(fmt.Sprintf("A book can't have more than %d authors", MAX_AUTHORS_FOR_BOOK))
+
 func HandlePostBooks(c *gin.Context) {
 
 	bookInput := BookInput{}
@@ -95,6 +101,11 @@ func HandlePostBooks(c *gin.Context) {
 
 	if dbc := dbi.Create(&newBook); dbc.Error != nil {
 		c.AbortWithError(http.StatusBadRequest, dbc.Error)
+		return
+	}
+
+	if len(bookInput.Authors) > MAX_AUTHORS_FOR_BOOK {
+		c.AbortWithError(http.StatusBadRequest, ErrTooManyAuthors)
 		return
 	}
 
@@ -146,6 +157,69 @@ func HandleDeleteBooks(c *gin.Context) {
 
 	if dbi.RowsAffected < 1 {
 		c.Status(http.StatusNotFound)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+var ErrToUpdateMustProvideBookID = errors.New("To update a book you need to specify its id")
+
+func HandleUpdateBooks(c *gin.Context) {
+	idString, isThere := c.Params.Get("id")
+	if !isThere {
+		c.AbortWithError(http.StatusBadRequest, ErrToUpdateMustProvideBookID)
+		return
+	}
+
+	bookId64, err := strconv.ParseUint(idString, 10, 64)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	bookId := uint(bookId64)
+
+	bookInput := BookInput{}
+	if err := c.BindJSON(&bookInput); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+
+	bookUpdates := db.Book{
+		Name:    bookInput.Name,
+		PubYear: bookInput.PubYear,
+		Edition: bookInput.Edition,
+	}
+
+	dbi := db.Use()
+	bookToUpdate := db.Book{ID: bookId}
+	dbr := dbi.Where(&bookToUpdate).Updates(&bookUpdates)
+	if err := dbr.Error; err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	bal := db.BookAuthorLink{BookID: bookId}
+
+	dbi = dbi.Where(&bal).Not("author_id IN ?", bookInput.Authors)
+	dbr = dbi.Delete(&bal)
+	if err := dbr.Error; err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	balsToInsert := make([]db.BookAuthorLink, 0, MAX_AUTHORS_FOR_BOOK)
+	for _, authorID := range bookInput.Authors {
+		bal.AuthorID = authorID
+		balsToInsert = append(balsToInsert, bal)
+	}
+
+	dbr = dbi.Clauses(clause.OnConflict{
+		DoNothing: true,
+	}).CreateInBatches(balsToInsert, MAX_AUTHORS_FOR_BOOK)
+
+	if err := dbr.Error; err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
